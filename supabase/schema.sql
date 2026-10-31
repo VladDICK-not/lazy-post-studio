@@ -1,6 +1,25 @@
--- Schema for Cross-Post Studio
+-- Schema for Lazy-Post Studio
 -- Run this in your Supabase SQL Editor (https://supabase.com/dashboard/project/_/sql)
 
+-- 1. Table for multiple channels and accounts (Telegram & Threads)
+create table if not exists public.channels (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz default now() not null,
+  updated_at timestamptz default now() not null,
+  name text not null,                           -- e.g. "IT Новости", "@vlad_threads"
+  platform text not null check (platform in ('telegram', 'threads')),
+  is_active boolean default true not null,
+  
+  -- Telegram credentials
+  telegram_channel_id text,                     -- e.g. "@my_channel" or "-100..."
+  telegram_bot_token text,                      -- Optional custom bot token (uses .env if null)
+  
+  -- Threads credentials
+  threads_user_id text,                         -- Threads User ID
+  threads_access_token text                     -- Threads Long-Lived Access Token
+);
+
+-- 2. Posts Table
 create table if not exists public.posts (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz default now() not null,
@@ -13,9 +32,10 @@ create table if not exists public.posts (
   threads_custom_text text,            -- Optional custom override text for Threads (< 500 chars)
   media_url text,                      -- Image URL (Supabase storage or external)
   
-  -- Target platforms
+  -- Target platform flags & specific channel IDs
   publish_to_telegram boolean default true not null,
   publish_to_threads boolean default true not null,
+  target_channel_ids uuid[] default '{}'::uuid[] not null, -- Array of selected channel UUIDs
   
   -- Status tracking: 'draft', 'scheduled', 'publishing', 'published', 'failed'
   status text not null check (status in ('draft', 'scheduled', 'publishing', 'published', 'failed')) default 'scheduled',
@@ -30,17 +50,15 @@ create table if not exists public.posts (
 -- Index for fast cron queries
 create index if not exists idx_posts_cron on public.posts (status, scheduled_at);
 
--- Set up Supabase Storage Bucket for media
+-- 3. Storage Bucket for Media
 insert into storage.buckets (id, name, public) 
 values ('post-media', 'post-media', true)
 on conflict (id) do nothing;
 
--- Storage public read policy
 create policy "Public Access to Post Media"
 on storage.objects for select
 using (bucket_id = 'post-media');
 
--- Service role / authenticated write policy
 create policy "Service Role upload Post Media"
 on storage.objects for insert
 with check (bucket_id = 'post-media');

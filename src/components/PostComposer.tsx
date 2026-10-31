@@ -13,12 +13,16 @@ import {
   Sparkles,
   Rocket,
   Loader2,
+  Settings2,
 } from 'lucide-react';
 import { TipTapEditor } from './TipTapEditor';
 import { DateTimePicker } from './DateTimePicker';
 import { formatForThreads, getCharacterCount } from '@/lib/text-helpers';
+import { Channel } from '@/lib/types';
 
 interface PostComposerProps {
+  channels: Channel[];
+  onManageChannels: () => void;
   onPostCreated: () => void;
   onPreviewChange: (data: {
     title: string;
@@ -28,7 +32,12 @@ interface PostComposerProps {
   }) => void;
 }
 
-export function PostComposer({ onPostCreated, onPreviewChange }: PostComposerProps) {
+export function PostComposer({
+  channels,
+  onManageChannels,
+  onPostCreated,
+  onPreviewChange,
+}: PostComposerProps) {
   const [title, setTitle] = useState('');
   const [contentHtml, setContentHtml] = useState('');
   const [contentPlain, setContentPlain] = useState('');
@@ -41,9 +50,28 @@ export function PostComposer({ onPostCreated, onPreviewChange }: PostComposerPro
   const [mediaUrl, setMediaUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
 
-  // Channels
+  // Channels state
+  const [selectedChannelIds, setSelectedChannelIds] = useState<string[]>(() =>
+    channels.map((c) => c.id)
+  );
+  // Fallback defaults if no custom channels added yet
   const [publishToTelegram, setPublishToTelegram] = useState(true);
   const [publishToThreads, setPublishToThreads] = useState(true);
+
+  // Keep selected channels in sync if channels list updates
+  React.useEffect(() => {
+    if (channels.length > 0 && selectedChannelIds.length === 0) {
+      setSelectedChannelIds(channels.map((c) => c.id));
+    }
+  }, [channels, selectedChannelIds.length]);
+
+  const toggleChannel = (id: string) => {
+    if (selectedChannelIds.includes(id)) {
+      setSelectedChannelIds(selectedChannelIds.filter((chId) => chId !== id));
+    } else {
+      setSelectedChannelIds([...selectedChannelIds, id]);
+    }
+  };
 
   // Scheduling
   const getDefaultScheduledTime = () => {
@@ -131,7 +159,13 @@ export function PostComposer({ onPostCreated, onPreviewChange }: PostComposerPro
       setErrorMsg('Пожалуйста, введите текст новости');
       return;
     }
-    if (!publishToTelegram && !publishToThreads) {
+
+    const hasSelectedChannels =
+      channels.length > 0
+        ? selectedChannelIds.length > 0
+        : publishToTelegram || publishToThreads;
+
+    if (!hasSelectedChannels) {
       setErrorMsg('Выберите хотя бы один канал для публикации');
       return;
     }
@@ -149,6 +183,7 @@ export function PostComposer({ onPostCreated, onPreviewChange }: PostComposerPro
         scheduled_at: new Date(scheduledAt).toISOString(),
         publish_to_telegram: publishToTelegram,
         publish_to_threads: publishToThreads,
+        target_channel_ids: channels.length > 0 ? selectedChannelIds : [],
         publish_now: publishNow,
       };
 
@@ -354,50 +389,104 @@ export function PostComposer({ onPostCreated, onPreviewChange }: PostComposerPro
           )}
         </div>
 
-        {/* Target Channels Selection */}
+        {/* Dynamic Channels Selection */}
         <div>
-          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
-            Каналы публикации
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label
-              className={`flex items-center gap-2.5 p-3 rounded-2xl border cursor-pointer transition-all ${
-                publishToTelegram
-                  ? 'bg-sky-50/70 dark:bg-sky-500/10 border-sky-400 dark:border-sky-500/40 text-sky-950 dark:text-white shadow-2xs'
-                  : 'bg-zinc-50/60 dark:bg-[#1c1d23] border-zinc-200 dark:border-[#33353e] text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700'
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={publishToTelegram}
-                onChange={(e) => setPublishToTelegram(e.target.checked)}
-                className="w-4 h-4 rounded-md text-sky-500 bg-white dark:bg-[#1c1d23] border-zinc-300 dark:border-zinc-700 focus:ring-0"
-              />
-              <div className="flex items-center gap-2">
-                <Send className="w-4 h-4 text-sky-500" />
-                <span className="text-xs font-semibold">Telegram-канал</span>
-              </div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+              Куда опубликовать ({channels.length > 0 ? `${selectedChannelIds.length} из ${channels.length}` : 'дефолтные'})
             </label>
-
-            <label
-              className={`flex items-center gap-2.5 p-3 rounded-2xl border cursor-pointer transition-all ${
-                publishToThreads
-                  ? 'bg-zinc-100/80 dark:bg-zinc-100/10 border-zinc-400 dark:border-zinc-400/40 text-zinc-900 dark:text-white shadow-2xs'
-                  : 'bg-zinc-50/60 dark:bg-[#1c1d23] border-zinc-200 dark:border-[#33353e] text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700'
-              }`}
+            <button
+              type="button"
+              onClick={onManageChannels}
+              className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 font-medium cursor-pointer"
             >
-              <input
-                type="checkbox"
-                checked={publishToThreads}
-                onChange={(e) => setPublishToThreads(e.target.checked)}
-                className="w-4 h-4 rounded-md text-zinc-800 dark:text-zinc-200 bg-white dark:bg-[#1c1d23] border-zinc-300 dark:border-zinc-700 focus:ring-0"
-              />
-              <div className="flex items-center gap-2">
-                <AtSign className="w-4 h-4 text-zinc-800 dark:text-zinc-200" />
-                <span className="text-xs font-semibold">Threads-аккаунт</span>
-              </div>
-            </label>
+              <Settings2 className="w-3.5 h-3.5" />
+              <span>Настроить каналы и ключи</span>
+            </button>
           </div>
+
+          {channels.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {channels.map((ch) => {
+                const isSelected = selectedChannelIds.includes(ch.id);
+                return (
+                  <button
+                    key={ch.id}
+                    type="button"
+                    onClick={() => toggleChannel(ch.id)}
+                    className={`flex items-center gap-2.5 p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                      isSelected
+                        ? ch.platform === 'telegram'
+                          ? 'bg-sky-50/70 dark:bg-sky-500/10 border-sky-400 dark:border-sky-500/40 text-sky-950 dark:text-white shadow-2xs'
+                          : 'bg-zinc-100/80 dark:bg-zinc-100/10 border-zinc-400 dark:border-zinc-400/40 text-zinc-900 dark:text-white shadow-2xs'
+                        : 'bg-zinc-50/60 dark:bg-[#1c1d23] border-zinc-200 dark:border-[#33353e] text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700'
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded-md border flex items-center justify-center transition-colors ${
+                        isSelected
+                          ? ch.platform === 'telegram'
+                            ? 'bg-sky-500 border-sky-500 text-white'
+                            : 'bg-zinc-900 dark:bg-white border-zinc-900 dark:border-white text-white dark:text-zinc-900'
+                          : 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-[#1c1d23]'
+                      }`}
+                    >
+                      {isSelected && <span className="text-[10px] font-bold">✓</span>}
+                    </div>
+
+                    <div className="flex items-center gap-2 min-w-0">
+                      {ch.platform === 'telegram' ? (
+                        <Send className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                      ) : (
+                        <AtSign className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300 shrink-0" />
+                      )}
+                      <span className="text-xs font-semibold truncate">{ch.name}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <label
+                className={`flex items-center gap-2.5 p-3 rounded-2xl border cursor-pointer transition-all ${
+                  publishToTelegram
+                    ? 'bg-sky-50/70 dark:bg-sky-500/10 border-sky-400 dark:border-sky-500/40 text-sky-950 dark:text-white shadow-2xs'
+                    : 'bg-zinc-50/60 dark:bg-[#1c1d23] border-zinc-200 dark:border-[#33353e] text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={publishToTelegram}
+                  onChange={(e) => setPublishToTelegram(e.target.checked)}
+                  className="w-4 h-4 rounded-md text-sky-500 bg-white dark:bg-[#1c1d23] border-zinc-300 dark:border-zinc-700 focus:ring-0"
+                />
+                <div className="flex items-center gap-2">
+                  <Send className="w-4 h-4 text-sky-500" />
+                  <span className="text-xs font-semibold">Telegram-канал</span>
+                </div>
+              </label>
+
+              <label
+                className={`flex items-center gap-2.5 p-3 rounded-2xl border cursor-pointer transition-all ${
+                  publishToThreads
+                    ? 'bg-zinc-100/80 dark:bg-zinc-100/10 border-zinc-400 dark:border-zinc-400/40 text-zinc-900 dark:text-white shadow-2xs'
+                    : 'bg-zinc-50/60 dark:bg-[#1c1d23] border-zinc-200 dark:border-[#33353e] text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={publishToThreads}
+                  onChange={(e) => setPublishToThreads(e.target.checked)}
+                  className="w-4 h-4 rounded-md text-zinc-800 dark:text-zinc-200 bg-white dark:bg-[#1c1d23] border-zinc-300 dark:border-zinc-700 focus:ring-0"
+                />
+                <div className="flex items-center gap-2">
+                  <AtSign className="w-4 h-4 text-zinc-800 dark:text-zinc-200" />
+                  <span className="text-xs font-semibold">Threads-аккаунт</span>
+                </div>
+              </label>
+            </div>
+          )}
         </div>
 
         {/* Schedule Time via Interactive Popover */}

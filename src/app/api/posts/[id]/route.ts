@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isRequestAuthenticated } from '@/lib/auth';
 import { getServiceSupabase } from '@/lib/supabase';
-import { publishToTelegram, sendAdminNotification } from '@/lib/telegram';
-import { publishToThreads } from '@/lib/threads';
-import { formatForTelegram, formatForThreads } from '@/lib/text-helpers';
+import { sendAdminNotification } from '@/lib/telegram';
+import { executePostPublish } from '@/lib/publisher';
 
 export async function DELETE(
   req: NextRequest,
@@ -49,49 +48,17 @@ export async function POST(
       return NextResponse.json({ error: 'Пост не найден' }, { status: 404 });
     }
 
-    const tgHtml = formatForTelegram(post.content_html);
-    const threadsText = post.threads_custom_text?.trim()
-      ? post.threads_custom_text.trim()
-      : formatForThreads(post.content_html);
-
-    let tgMessageId: string | undefined;
-    let threadsPostId: string | undefined;
-    const errors: string[] = [];
-
-    if (post.publish_to_telegram) {
-      const tgRes = await publishToTelegram({
-        htmlContent: tgHtml,
-        mediaUrl: post.media_url,
-      });
-      if (tgRes.success) {
-        tgMessageId = tgRes.messageId;
-      } else {
-        errors.push(`Telegram: ${tgRes.error}`);
-      }
-    }
-
-    if (post.publish_to_threads) {
-      const threadsRes = await publishToThreads({
-        text: threadsText,
-        mediaUrl: post.media_url,
-      });
-      if (threadsRes.success) {
-        threadsPostId = threadsRes.postId;
-      } else {
-        errors.push(`Threads: ${threadsRes.error}`);
-      }
-    }
-
-    const hasError = errors.length > 0;
+    const publishResult = await executePostPublish(post, supabase);
+    const hasError = !publishResult.allSuccess;
     const finalStatus = hasError ? 'failed' : 'published';
-    const errorMessage = hasError ? errors.join('; ') : null;
+    const errorMessage = hasError ? publishResult.errors.join('; ') : null;
 
     await supabase
       .from('posts')
       .update({
         status: finalStatus,
-        telegram_message_id: tgMessageId || post.telegram_message_id,
-        threads_post_id: threadsPostId || post.threads_post_id,
+        telegram_message_id: publishResult.tgMessageId || post.telegram_message_id,
+        threads_post_id: publishResult.threadsPostId || post.threads_post_id,
         error_message: errorMessage,
         published_at: hasError ? null : new Date().toISOString(),
         updated_at: new Date().toISOString(),

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isRequestAuthenticated } from '@/lib/auth';
 import { getServiceSupabase } from '@/lib/supabase';
-import { publishToTelegram, sendAdminNotification } from '@/lib/telegram';
-import { publishToThreads } from '@/lib/threads';
-import { formatForTelegram, formatForThreads } from '@/lib/text-helpers';
+import { sendAdminNotification } from '@/lib/telegram';
+import { executePostPublish } from '@/lib/publisher';
 import { CreatePostInput } from '@/lib/types';
 
 export async function GET() {
@@ -45,6 +44,7 @@ export async function POST(req: NextRequest) {
       scheduled_at,
       publish_to_telegram,
       publish_to_threads,
+      target_channel_ids = [],
       publish_now,
     } = body;
 
@@ -53,12 +53,6 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = getServiceSupabase();
-
-    // Prepare formats
-    const tgHtml = formatForTelegram(content_html);
-    const threadsText = threads_custom_text?.trim()
-      ? threads_custom_text.trim()
-      : formatForThreads(content_html);
 
     if (publish_now) {
       // 1. Insert as publishing
@@ -73,6 +67,7 @@ export async function POST(req: NextRequest) {
           scheduled_at: new Date().toISOString(),
           publish_to_telegram,
           publish_to_threads,
+          target_channel_ids,
           status: 'publishing',
         })
         .select()
@@ -82,47 +77,19 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: insertError.message }, { status: 500 });
       }
 
-      let tgMessageId: string | undefined;
-      let threadsPostId: string | undefined;
-      const errors: string[] = [];
-
-      // Execute Telegram publish
-      if (publish_to_telegram) {
-        const tgRes = await publishToTelegram({
-          htmlContent: tgHtml,
-          mediaUrl: media_url,
-        });
-        if (tgRes.success) {
-          tgMessageId = tgRes.messageId;
-        } else {
-          errors.push(`Telegram: ${tgRes.error}`);
-        }
-      }
-
-      // Execute Threads publish
-      if (publish_to_threads) {
-        const threadsRes = await publishToThreads({
-          text: threadsText,
-          mediaUrl: media_url,
-        });
-        if (threadsRes.success) {
-          threadsPostId = threadsRes.postId;
-        } else {
-          errors.push(`Threads: ${threadsRes.error}`);
-        }
-      }
-
-      const hasError = errors.length > 0;
+      // Execute publish
+      const publishResult = await executePostPublish(post, supabase);
+      const hasError = !publishResult.allSuccess;
       const finalStatus = hasError ? 'failed' : 'published';
-      const errorMessage = hasError ? errors.join('; ') : null;
+      const errorMessage = hasError ? publishResult.errors.join('; ') : null;
 
       // Update post in DB
       await supabase
         .from('posts')
         .update({
           status: finalStatus,
-          telegram_message_id: tgMessageId || null,
-          threads_post_id: threadsPostId || null,
+          telegram_message_id: publishResult.tgMessageId || null,
+          threads_post_id: publishResult.threadsPostId || null,
           error_message: errorMessage,
           published_at: hasError ? null : new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -136,7 +103,7 @@ export async function POST(req: NextRequest) {
         );
       } else {
         await sendAdminNotification(
-          `✅ <b>Пост опубликован:</b> "${title}"\nКаналы: ${publish_to_telegram ? 'Telegram ' : ''}${publish_to_threads ? 'Threads' : ''}`
+          `✅ <b>Пост опубликован:</b> "${title}"`
         );
       }
 
@@ -158,6 +125,7 @@ export async function POST(req: NextRequest) {
           scheduled_at: scheduled_at || new Date().toISOString(),
           publish_to_telegram,
           publish_to_threads,
+          target_channel_ids,
           status: 'scheduled',
         })
         .select()

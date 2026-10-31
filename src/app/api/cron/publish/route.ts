@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
-import { publishToTelegram, sendAdminNotification } from '@/lib/telegram';
-import { publishToThreads } from '@/lib/threads';
-import { formatForTelegram, formatForThreads } from '@/lib/text-helpers';
+import { sendAdminNotification } from '@/lib/telegram';
+import { executePostPublish } from '@/lib/publisher';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,7 +38,7 @@ async function handleCronPublish(req: NextRequest) {
       .select('*')
       .eq('status', 'scheduled')
       .lte('scheduled_at', now)
-      .limit(10); // Batch size
+      .limit(10);
 
     if (fetchError) {
       console.error('[Cron Fetch Error]:', fetchError);
@@ -62,52 +61,18 @@ async function handleCronPublish(req: NextRequest) {
         .update({ status: 'publishing', updated_at: new Date().toISOString() })
         .eq('id', post.id);
 
-      const tgHtml = formatForTelegram(post.content_html);
-      const threadsText = post.threads_custom_text?.trim()
-        ? post.threads_custom_text.trim()
-        : formatForThreads(post.content_html);
-
-      let tgMessageId: string | undefined;
-      let threadsPostId: string | undefined;
-      const errors: string[] = [];
-
-      // Publish to Telegram
-      if (post.publish_to_telegram) {
-        const tgRes = await publishToTelegram({
-          htmlContent: tgHtml,
-          mediaUrl: post.media_url,
-        });
-        if (tgRes.success) {
-          tgMessageId = tgRes.messageId;
-        } else {
-          errors.push(`TG: ${tgRes.error}`);
-        }
-      }
-
-      // Publish to Threads
-      if (post.publish_to_threads) {
-        const threadsRes = await publishToThreads({
-          text: threadsText,
-          mediaUrl: post.media_url,
-        });
-        if (threadsRes.success) {
-          threadsPostId = threadsRes.postId;
-        } else {
-          errors.push(`Threads: ${threadsRes.error}`);
-        }
-      }
-
-      const hasError = errors.length > 0;
+      const publishResult = await executePostPublish(post, supabase);
+      const hasError = !publishResult.allSuccess;
       const finalStatus = hasError ? 'failed' : 'published';
-      const errorMessage = hasError ? errors.join('; ') : null;
+      const errorMessage = hasError ? publishResult.errors.join('; ') : null;
 
       // Update post in DB
       await supabase
         .from('posts')
         .update({
           status: finalStatus,
-          telegram_message_id: tgMessageId || null,
-          threads_post_id: threadsPostId || null,
+          telegram_message_id: publishResult.tgMessageId || null,
+          threads_post_id: publishResult.threadsPostId || null,
           error_message: errorMessage,
           published_at: hasError ? null : new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -121,7 +86,7 @@ async function handleCronPublish(req: NextRequest) {
         );
       } else {
         await sendAdminNotification(
-          `🚀 <b>Опубликовано по расписанию:</b> "${post.title}"\nКаналы: ${post.publish_to_telegram ? 'Telegram ' : ''}${post.publish_to_threads ? 'Threads' : ''}`
+          `🚀 <b>Опубликовано по расписанию:</b> "${post.title}"`
         );
       }
 
