@@ -5,6 +5,8 @@ import { sendAdminNotification } from '@/lib/telegram';
 import { executePostPublish } from '@/lib/publisher';
 import { CreatePostInput } from '@/lib/types';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   if (!isRequestAuthenticated()) {
     return NextResponse.json({ error: 'Доступ запрещен' }, { status: 401 });

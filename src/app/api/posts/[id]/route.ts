@@ -4,6 +4,8 @@ import { getServiceSupabase } from '@/lib/supabase';
 import { sendAdminNotification } from '@/lib/telegram';
 import { executePostPublish } from '@/lib/publisher';
 
+export const dynamic = 'force-dynamic';
+
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
