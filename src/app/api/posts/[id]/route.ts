@@ -29,6 +29,39 @@ export async function DELETE(
   }
 }
 
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  if (!isRequestAuthenticated()) {
+    return NextResponse.json({ error: 'Доступ запрещен' }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+    const supabase = getServiceSupabase();
+
+    const { data: post, error } = await supabase
+      .from('posts')
+      .update({
+        ...body,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', params.id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, post });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
 // Retry or trigger publish for a specific post
 export async function POST(
   req: NextRequest,

@@ -16,14 +16,17 @@ import {
   Settings2,
   Check,
   RotateCcw,
+  Pencil,
 } from 'lucide-react';
 import { TipTapEditor } from './TipTapEditor';
 import { DateTimePicker } from './DateTimePicker';
 import { formatForThreads, getCharacterCount } from '@/lib/text-helpers';
-import { Channel } from '@/lib/types';
+import { Channel, Post } from '@/lib/types';
 
 interface PostComposerProps {
   channels: Channel[];
+  editingPost?: Post | null;
+  onCancelEdit?: () => void;
   onManageChannels: () => void;
   onPostCreated: () => void;
   onPreviewChange: (data: {
@@ -36,6 +39,8 @@ interface PostComposerProps {
 
 export function PostComposer({
   channels,
+  editingPost,
+  onCancelEdit,
   onManageChannels,
   onPostCreated,
   onPreviewChange,
@@ -80,15 +85,39 @@ export function PostComposer({
     const d = new Date();
     d.setHours(d.getHours() + 1);
     d.setMinutes(0);
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-      .toISOString()
-      .slice(0, 16);
+    d.setSeconds(0);
+    d.setMilliseconds(0);
+    return d.toISOString();
   };
 
   const [scheduledAt, setScheduledAt] = useState(getDefaultScheduledTime);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Sync state if editing post changes
+  React.useEffect(() => {
+    if (editingPost) {
+      setTitle(editingPost.title || '');
+      setContentHtml(editingPost.content_html || '');
+      setContentPlain(editingPost.content_plain || '');
+      setThreadsCustomText(editingPost.threads_custom_text || '');
+      setShowThreadsCustom(Boolean(editingPost.threads_custom_text));
+      setMediaUrl(editingPost.media_url || '');
+      setScheduledAt(editingPost.scheduled_at);
+      if (editingPost.target_channel_ids && editingPost.target_channel_ids.length > 0) {
+        setSelectedChannelIds(editingPost.target_channel_ids);
+      }
+      setPublishToTelegram(editingPost.publish_to_telegram);
+      setPublishToThreads(editingPost.publish_to_threads);
+      notifyPreview({
+        t: editingPost.title,
+        html: editingPost.content_html,
+        threadsText: editingPost.threads_custom_text || '',
+        media: editingPost.media_url || '',
+      });
+    }
+  }, [editingPost]);
 
   const handleResetForm = () => {
     setTitle('');
@@ -100,6 +129,9 @@ export function PostComposer({
     setScheduledAt(getDefaultScheduledTime());
     setErrorMsg(null);
     notifyPreview({ t: '', html: '', threadsText: '', media: '' });
+    if (editingPost && onCancelEdit) {
+      onCancelEdit();
+    }
   };
 
   // Update live preview in parent
@@ -158,11 +190,10 @@ export function PostComposer({
       d.setHours(specificHour, 0, 0, 0);
     } else {
       d.setMinutes(d.getMinutes() + minutesFromNow);
+      d.setSeconds(0);
+      d.setMilliseconds(0);
     }
-    const formatted = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-      .toISOString()
-      .slice(0, 16);
-    setScheduledAt(formatted);
+    setScheduledAt(d.toISOString());
   };
 
   const handleSubmit = async (publishNow: boolean = false) => {
@@ -212,8 +243,11 @@ export function PostComposer({
         publish_now: publishNow,
       };
 
-      const res = await fetch('/api/posts', {
-        method: 'POST',
+      const url = editingPost ? `/api/posts/${editingPost.id}` : '/api/posts';
+      const method = editingPost ? 'PATCH' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
@@ -232,6 +266,8 @@ export function PostComposer({
       setSuccessMsg(
         publishNow
           ? 'Пост успешно опубликован в выбранные каналы!'
+          : editingPost
+          ? 'Изменения в публикации успешно сохранены!'
           : 'Пост успешно запланирован!'
       );
       setTimeout(() => setSuccessMsg(null), 6000);
@@ -277,6 +313,22 @@ export function PostComposer({
           </button>
         )}
       </div>
+
+      {editingPost && (
+        <div className="mb-4 p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-800 dark:text-sky-300 text-xs font-medium flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <Pencil className="w-4 h-4 text-sky-500 shrink-0" />
+            <span>Редактирование публикации: <b className="text-zinc-900 dark:text-white">{editingPost.title}</b></span>
+          </div>
+          <button
+            type="button"
+            onClick={handleResetForm}
+            className="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline cursor-pointer"
+          >
+            Отменить
+          </button>
+        </div>
+      )}
 
       {successMsg && (
         <div className="mb-4 p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center justify-between animate-in fade-in">
@@ -571,7 +623,7 @@ export function PostComposer({
             ) : (
               <Calendar className="w-4 h-4" />
             )}
-            <span>Запланировать</span>
+            <span>{editingPost ? 'Сохранить изменения' : 'Запланировать'}</span>
           </button>
 
           <button

@@ -113,11 +113,10 @@ export function DateTimePicker({ value, onChange, onQuickPreset }: DateTimePicke
   const firstDay = getFirstDayOfWeek(viewYear, viewMonth);
 
   const handleSelectDay = (day: number) => {
-    const newDate = new Date(viewYear, viewMonth, day, parseInt(hours, 10), parseInt(minutes, 10));
-    const formatted = new Date(newDate.getTime() - newDate.getTimezoneOffset() * 60000)
-      .toISOString()
-      .slice(0, 16);
-    onChange(formatted);
+    const h = parseInt(hours, 10) || 0;
+    const m = parseInt(minutes, 10) || 0;
+    const newDate = new Date(viewYear, viewMonth, day, h, m, 0, 0);
+    onChange(newDate.toISOString());
   };
 
   const handleTimeChange = (newHours: string, newMins: string) => {
@@ -125,23 +124,22 @@ export function DateTimePicker({ value, onChange, onQuickPreset }: DateTimePicke
     setMinutes(newMins);
     const h = parseInt(newHours, 10) || 0;
     const m = parseInt(newMins, 10) || 0;
-    const newDate = new Date(validDate);
-    newDate.setHours(h);
-    newDate.setMinutes(m);
-    const formatted = new Date(newDate.getTime() - newDate.getTimezoneOffset() * 60000)
-      .toISOString()
-      .slice(0, 16);
-    onChange(formatted);
+    const day = validDate.getDate();
+    const newDate = new Date(viewYear, viewMonth, day, h, m, 0, 0);
+    onChange(newDate.toISOString());
   };
 
   // Friendly human format
   const formatDisplay = () => {
     try {
-      const day = validDate.getDate();
-      const monthName = MONTHS_RU[validDate.getMonth()].toLowerCase();
-      const year = validDate.getFullYear();
-      const timeStr = `${hours}:${minutes}`;
-      return `${day} ${monthName} ${year}, ${timeStr}`;
+      const d = value ? new Date(value) : new Date();
+      const valid = isNaN(d.getTime()) ? new Date() : d;
+      const day = valid.getDate();
+      const monthName = MONTHS_RU[valid.getMonth()].toLowerCase();
+      const year = valid.getFullYear();
+      const h = valid.getHours().toString().padStart(2, '0');
+      const m = valid.getMinutes().toString().padStart(2, '0');
+      return `${day} ${monthName} ${year}, ${h}:${m}`;
     } catch {
       return value;
     }

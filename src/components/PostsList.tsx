@@ -11,6 +11,7 @@ import {
   Trash2,
   RotateCw,
   Loader2,
+  Pencil,
 } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { Post } from '@/lib/types';
@@ -19,9 +20,10 @@ interface PostsListProps {
   posts: Post[];
   isLoading: boolean;
   onRefresh: () => void;
+  onEditPost?: (post: Post) => void;
 }
 
-export function PostsList({ posts, isLoading, onRefresh }: PostsListProps) {
+export function PostsList({ posts, isLoading, onRefresh, onEditPost }: PostsListProps) {
   const [activeTab, setActiveTab] = useState<'scheduled' | 'published' | 'failed'>('scheduled');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [deletePostId, setDeletePostId] = useState<string | null>(null);
@@ -31,6 +33,22 @@ export function PostsList({ posts, isLoading, onRefresh }: PostsListProps) {
     if (activeTab === 'published') return p.status === 'published';
     if (activeTab === 'failed') return p.status === 'failed';
     return true;
+  });
+
+  // User requirement 1:
+  // - Scheduled posts: nearest scheduled date to furthest
+  // - Published posts: most recent to oldest
+  // - Failed: most recent first
+  filteredPosts.sort((a, b) => {
+    if (activeTab === 'scheduled') {
+      return new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime();
+    }
+    if (activeTab === 'published') {
+      const timeA = new Date(a.published_at || a.created_at).getTime();
+      const timeB = new Date(b.published_at || b.created_at).getTime();
+      return timeB - timeA;
+    }
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
   const confirmDelete = async () => {
@@ -247,15 +265,29 @@ export function PostsList({ posts, isLoading, onRefresh }: PostsListProps) {
                     )}
 
                     {post.status === 'scheduled' && (
-                      <button
-                        type="button"
-                        onClick={() => handlePublishNow(post.id)}
-                        disabled={processingId === post.id}
-                        className="px-2 py-1 rounded-lg text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-[#2c2d36] text-[10px] font-medium flex items-center gap-1 transition-colors cursor-pointer"
-                        title="Опубликовать прямо сейчас"
-                      >
-                        <Send className="w-3 h-3" /> Отправить сейчас
-                      </button>
+                      <>
+                        {onEditPost && (
+                          <button
+                            type="button"
+                            onClick={() => onEditPost(post)}
+                            disabled={processingId === post.id}
+                            className="px-2 py-1 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-sky-500 hover:bg-sky-50 dark:hover:bg-[#2c2d36] text-[10px] font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Редактировать публикацию"
+                          >
+                            <Pencil className="w-3 h-3 text-sky-500" /> Редактировать
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => handlePublishNow(post.id)}
+                          disabled={processingId === post.id}
+                          className="px-2 py-1 rounded-lg text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-[#2c2d36] text-[10px] font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Опубликовать прямо сейчас"
+                        >
+                          <Send className="w-3 h-3" /> Отправить сейчас
+                        </button>
+                      </>
                     )}
 
                     <button

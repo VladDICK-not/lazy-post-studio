@@ -21,6 +21,7 @@ export default function DashboardPage() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [isLoadingPosts, setIsLoadingPosts] = useState(false);
   const [isChannelsModalOpen, setIsChannelsModalOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
@@ -253,8 +254,13 @@ export default function DashboardPage() {
           <div className="lg:col-span-7">
             <PostComposer
               channels={channels}
+              editingPost={editingPost}
+              onCancelEdit={() => setEditingPost(null)}
               onManageChannels={() => setIsChannelsModalOpen(true)}
-              onPostCreated={fetchPosts}
+              onPostCreated={() => {
+                setEditingPost(null);
+                fetchPosts();
+              }}
               onPreviewChange={setPreviewData}
             />
           </div>
@@ -272,6 +278,10 @@ export default function DashboardPage() {
               posts={posts}
               isLoading={isLoadingPosts}
               onRefresh={fetchPosts}
+              onEditPost={(post) => {
+                setEditingPost(post);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
             />
           </div>
         </div>
