@@ -11,14 +11,25 @@ export interface PublishResult {
   threadsPostId?: string;
 }
 
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 export async function executePostPublish(
   post: Post,
   supabase: SupabaseClient
 ): Promise<PublishResult> {
-  const tgHtml = formatForTelegram(post.content_html);
+  const titleFormattedTg = post.title?.trim()
+    ? `<b>${escapeHtml(post.title.trim())}</b>\n\n`
+    : '';
+  const tgHtml = titleFormattedTg + formatForTelegram(post.content_html);
+
+  const titleFormattedThreads = post.title?.trim()
+    ? `${post.title.trim()}\n\n`
+    : '';
   const threadsText = post.threads_custom_text?.trim()
     ? post.threads_custom_text.trim()
-    : formatForThreads(post.content_html);
+    : titleFormattedThreads + formatForThreads(post.content_html);
 
   const errors: string[] = [];
   let tgMessageId: string | undefined;

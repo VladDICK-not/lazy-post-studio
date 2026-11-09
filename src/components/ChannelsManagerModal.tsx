@@ -10,6 +10,7 @@ import {
   Check,
   Loader2,
   Settings,
+  Pencil,
 } from 'lucide-react';
 import { Channel, PlatformType } from '@/lib/types';
 
@@ -27,6 +28,7 @@ export function ChannelsManagerModal({
   onRefreshChannels,
 }: ChannelsManagerModalProps) {
   const [isAdding, setIsAdding] = useState(false);
+  const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
   const [platform, setPlatform] = useState<PlatformType>('telegram');
 
   // Form state
@@ -41,7 +43,30 @@ export function ChannelsManagerModal({
 
   if (!isOpen) return null;
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCancel = () => {
+    setIsAdding(false);
+    setEditingChannelId(null);
+    setName('');
+    setTelegramChannelId('');
+    setTelegramBotToken('');
+    setThreadsUserId('');
+    setThreadsAccessToken('');
+    setErrorMsg(null);
+  };
+
+  const handleStartEdit = (channel: Channel) => {
+    setEditingChannelId(channel.id);
+    setName(channel.name);
+    setPlatform(channel.platform);
+    setTelegramChannelId(channel.telegram_channel_id || '');
+    setTelegramBotToken(channel.telegram_bot_token || '');
+    setThreadsUserId(channel.threads_user_id || '');
+    setThreadsAccessToken(channel.threads_access_token || '');
+    setIsAdding(true);
+    setErrorMsg(null);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setErrorMsg('Укажите название канала или профиля');
@@ -49,7 +74,7 @@ export function ChannelsManagerModal({
     }
 
     if (platform === 'telegram' && !telegramChannelId.trim()) {
-      setErrorMsg('Укажите ID или логин Telegram-канала (например: @my_channel)');
+      setErrorMsg('Укажите ID или логин Telegram-канала (например: @my_channel или -100...)');
       return;
     }
 
@@ -62,17 +87,22 @@ export function ChannelsManagerModal({
     setErrorMsg(null);
 
     try {
-      const res = await fetch('/api/channels', {
-        method: 'POST',
+      const payload = {
+        name: name.trim(),
+        platform,
+        telegram_channel_id: telegramChannelId.trim(),
+        telegram_bot_token: telegramBotToken.trim(),
+        threads_user_id: threadsUserId.trim(),
+        threads_access_token: threadsAccessToken.trim(),
+      };
+
+      const url = editingChannelId ? `/api/channels/${editingChannelId}` : '/api/channels';
+      const method = editingChannelId ? 'PATCH' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          platform,
-          telegram_channel_id: telegramChannelId.trim(),
-          telegram_bot_token: telegramBotToken.trim(),
-          threads_user_id: threadsUserId.trim(),
-          threads_access_token: threadsAccessToken.trim(),
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -80,13 +110,7 @@ export function ChannelsManagerModal({
         throw new Error(data.error || 'Не удалось сохранить канал');
       }
 
-      // Reset
-      setName('');
-      setTelegramChannelId('');
-      setTelegramBotToken('');
-      setThreadsUserId('');
-      setThreadsAccessToken('');
-      setIsAdding(false);
+      handleCancel();
       onRefreshChannels();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -171,14 +195,14 @@ export function ChannelsManagerModal({
             </button>
           ) : (
             /* Add Channel Card */
-            <form onSubmit={handleCreate} className="p-4 rounded-2xl bg-zinc-50 dark:bg-[#1c1d23] border border-zinc-200 dark:border-[#33353e] space-y-3.5 shadow-2xs">
+            <form onSubmit={handleSave} className="p-4 rounded-2xl bg-zinc-50 dark:bg-[#1c1d23] border border-zinc-200 dark:border-[#33353e] space-y-3.5 shadow-2xs">
               <div className="flex items-center justify-between pb-2 border-b border-zinc-200/60 dark:border-[#33353e]/60">
                 <span className="text-xs font-bold text-zinc-900 dark:text-white">
-                  Новый канал
+                  {editingChannelId ? 'Редактировать канал' : 'Новый канал'}
                 </span>
                 <button
                   type="button"
-                  onClick={() => setIsAdding(false)}
+                  onClick={handleCancel}
                   className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
                 >
                   Отмена
@@ -306,7 +330,7 @@ export function ChannelsManagerModal({
                 ) : (
                   <>
                     <Check className="w-3.5 h-3.5" />
-                    <span>Сохранить канал</span>
+                    <span>{editingChannelId ? 'Сохранить изменения' : 'Сохранить канал'}</span>
                   </>
                 )}
               </button>
@@ -376,6 +400,15 @@ export function ChannelsManagerModal({
                       }`}
                     >
                       {ch.is_active ? 'Активен' : 'Отключен'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleStartEdit(ch)}
+                      className="p-1.5 rounded-lg text-zinc-400 hover:text-sky-500 hover:bg-sky-50 dark:hover:bg-[#2c2d36] transition-colors cursor-pointer"
+                      title="Редактировать канал"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
                     </button>
 
                     <button

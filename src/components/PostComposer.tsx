@@ -14,6 +14,8 @@ import {
   Rocket,
   Loader2,
   Settings2,
+  Check,
+  RotateCcw,
 } from 'lucide-react';
 import { TipTapEditor } from './TipTapEditor';
 import { DateTimePicker } from './DateTimePicker';
@@ -86,6 +88,19 @@ export function PostComposer({
   const [scheduledAt, setScheduledAt] = useState(getDefaultScheduledTime);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const handleResetForm = () => {
+    setTitle('');
+    setContentHtml('');
+    setContentPlain('');
+    setThreadsCustomText('');
+    setMediaUrl('');
+    setShowThreadsCustom(false);
+    setScheduledAt(getDefaultScheduledTime());
+    setErrorMsg(null);
+    notifyPreview({ t: '', html: '', threadsText: '', media: '' });
+  };
 
   // Update live preview in parent
   const notifyPreview = (updated: {
@@ -198,15 +213,18 @@ export function PostComposer({
         throw new Error(data.error || 'Ошибка при сохранении поста');
       }
 
+      if (publishNow && data.error) {
+        throw new Error(data.error);
+      }
+
       // Reset form on success
-      setTitle('');
-      setContentHtml('');
-      setContentPlain('');
-      setThreadsCustomText('');
-      setMediaUrl('');
-      setShowThreadsCustom(false);
-      setScheduledAt(getDefaultScheduledTime());
-      notifyPreview({ t: '', html: '', threadsText: '', media: '' });
+      handleResetForm();
+      setSuccessMsg(
+        publishNow
+          ? 'Пост успешно опубликован в выбранные каналы!'
+          : 'Пост успешно запланирован!'
+      );
+      setTimeout(() => setSuccessMsg(null), 6000);
 
       onPostCreated();
     } catch (err: unknown) {
@@ -236,7 +254,35 @@ export function PostComposer({
             Заполните новость, настройте каналы и запланируйте время выхода
           </p>
         </div>
+
+        {(title || contentHtml || mediaUrl) && (
+          <button
+            type="button"
+            onClick={handleResetForm}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1c1d23] border border-zinc-200/80 dark:border-[#33353e] transition-all cursor-pointer"
+            title="Очистить поля и начать заново"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Очистить</span>
+          </button>
+        )}
       </div>
+
+      {successMsg && (
+        <div className="mb-4 p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+            <span>{successMsg}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSuccessMsg(null)}
+            className="p-1 rounded-lg text-emerald-600/60 hover:text-emerald-600 dark:text-emerald-400/60 dark:hover:text-emerald-400 cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {errorMsg && (
         <div className="mb-4 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-300 text-xs font-medium">

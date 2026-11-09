@@ -57,6 +57,12 @@ export function TipTapEditor({
     },
   });
 
+  React.useEffect(() => {
+    if (editor && content !== editor.getHTML()) {
+      editor.commands.setContent(content || '');
+    }
+  }, [content, editor]);
+
   const setLink = () => {
     if (!editor) return;
     const previousUrl = editor.getAttributes('link').href;

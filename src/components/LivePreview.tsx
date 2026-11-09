@@ -11,6 +11,10 @@ interface LivePreviewProps {
   mediaUrl?: string | null;
 }
 
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 export function LivePreview({
   title,
   contentHtml,
@@ -19,10 +23,17 @@ export function LivePreview({
 }: LivePreviewProps) {
   const [platform, setPlatform] = useState<'telegram' | 'threads'>('telegram');
 
-  const tgHtml = formatForTelegram(contentHtml);
+  const titleFormattedTg = title?.trim()
+    ? `<b>${escapeHtml(title.trim())}</b>\n\n`
+    : '';
+  const tgHtml = titleFormattedTg + formatForTelegram(contentHtml);
+
+  const titleFormattedThreads = title?.trim()
+    ? `${title.trim()}\n\n`
+    : '';
   const threadsText = threadsCustomText?.trim()
     ? threadsCustomText.trim()
-    : formatForThreads(contentHtml);
+    : titleFormattedThreads + formatForThreads(contentHtml);
 
   const threadsCharCount = getCharacterCount(threadsText);
   const isOverThreadsLimit = threadsCharCount > 500;
@@ -92,12 +103,6 @@ export function LivePreview({
             )}
 
             {/* Content Body */}
-            {title && (
-              <p className="text-sm font-bold text-zinc-900 dark:text-white mb-2 leading-snug">
-                {title}
-              </p>
-            )}
-
             {tgHtml ? (
               <div
                 className="text-xs text-zinc-800 dark:text-zinc-200 leading-relaxed space-y-2 whitespace-pre-wrap break-words"
