@@ -83,6 +83,12 @@ export async function POST(
       return NextResponse.json({ error: 'Пост не найден' }, { status: 404 });
     }
 
+    // Set in-flight publishing status
+    await supabase
+      .from('posts')
+      .update({ status: 'publishing', updated_at: new Date().toISOString() })
+      .eq('id', post.id);
+
     const publishResult = await executePostPublish(post, supabase);
     const hasError = !publishResult.allSuccess;
     const finalStatus = hasError ? 'failed' : 'published';

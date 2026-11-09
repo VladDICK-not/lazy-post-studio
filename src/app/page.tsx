@@ -117,6 +117,8 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!isAuthenticated) return;
 
+    const hasPublishing = posts.some((p) => p.status === 'publishing');
+
     const checkScheduled = async () => {
       try {
         const res = await fetch('/api/cron/publish');
@@ -132,9 +134,17 @@ export default function DashboardPage() {
     };
 
     checkScheduled();
-    const interval = setInterval(checkScheduled, 20000);
+    // Fast 3s polling while a post is actively being sent to socials, otherwise 20s
+    const pollInterval = hasPublishing ? 3000 : 20000;
+    const interval = setInterval(() => {
+      checkScheduled();
+      if (hasPublishing) {
+        fetchPosts();
+      }
+    }, pollInterval);
+
     return () => clearInterval(interval);
-  }, [isAuthenticated, fetchPosts]);
+  }, [isAuthenticated, posts, fetchPosts]);
 
   const handleLogout = async () => {
     await fetch('/api/auth', { method: 'DELETE' });

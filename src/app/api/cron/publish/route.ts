@@ -33,13 +33,13 @@ async function handleCronPublish(req: NextRequest) {
   try {
     const supabase = getServiceSupabase();
     const now = new Date().toISOString();
+    const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000).toISOString();
 
-    // 1. Fetch posts ready for publication
+    // 1. Fetch posts ready for publication (or recovery of stuck in-flight posts)
     const { data: duePosts, error: fetchError } = await supabase
       .from('posts')
       .select('*')
-      .eq('status', 'scheduled')
-      .lte('scheduled_at', now)
+      .or(`and(status.eq.scheduled,scheduled_at.lte.${now}),and(status.eq.publishing,updated_at.lte.${threeMinutesAgo})`)
       .limit(10);
 
     if (fetchError) {
