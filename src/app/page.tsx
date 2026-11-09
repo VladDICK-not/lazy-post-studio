@@ -112,6 +112,29 @@ export default function DashboardPage() {
     }
   }, [isAuthenticated, fetchPosts, fetchChannels]);
 
+  // Periodic auto-check for scheduled posts while app is open
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const checkScheduled = async () => {
+      try {
+        const res = await fetch('/api/cron/publish');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.processed && data.processed > 0) {
+            fetchPosts();
+          }
+        }
+      } catch {
+        // silent check
+      }
+    };
+
+    checkScheduled();
+    const interval = setInterval(checkScheduled, 20000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, fetchPosts]);
+
   const handleLogout = async () => {
     await fetch('/api/auth', { method: 'DELETE' });
     setIsAuthenticated(false);

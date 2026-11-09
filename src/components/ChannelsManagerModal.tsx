@@ -12,6 +12,7 @@ import {
   Settings,
   Pencil,
 } from 'lucide-react';
+import { ConfirmModal } from './ConfirmModal';
 import { Channel, PlatformType } from '@/lib/types';
 
 interface ChannelsManagerModalProps {
@@ -29,6 +30,7 @@ export function ChannelsManagerModal({
 }: ChannelsManagerModalProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
+  const [deleteChannelId, setDeleteChannelId] = useState<string | null>(null);
   const [platform, setPlatform] = useState<PlatformType>('telegram');
 
   // Form state
@@ -120,8 +122,10 @@ export function ChannelsManagerModal({
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Удалить этот канал из списка?')) return;
+  const confirmDelete = async () => {
+    if (!deleteChannelId) return;
+    const id = deleteChannelId;
+    setDeleteChannelId(null);
     try {
       const res = await fetch(`/api/channels/${id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -130,6 +134,10 @@ export function ChannelsManagerModal({
     } catch (err) {
       console.error('Delete channel error:', err);
     }
+  };
+
+  const handleDelete = (id: string) => {
+    setDeleteChannelId(id);
   };
 
   const handleToggleActive = async (channel: Channel) => {
@@ -433,6 +441,17 @@ export function ChannelsManagerModal({
           </p>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={Boolean(deleteChannelId)}
+        title="Удалить канал?"
+        description="Вы уверены, что хотите удалить этот канал из списка подключенных каналов? Это действие нельзя отменить."
+        confirmText="Удалить"
+        cancelText="Отмена"
+        isDanger={true}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteChannelId(null)}
+      />
     </div>
   );
 }

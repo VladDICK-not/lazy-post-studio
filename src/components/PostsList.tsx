@@ -12,6 +12,7 @@ import {
   RotateCw,
   Loader2,
 } from 'lucide-react';
+import { ConfirmModal } from './ConfirmModal';
 import { Post } from '@/lib/types';
 
 interface PostsListProps {
@@ -23,6 +24,7 @@ interface PostsListProps {
 export function PostsList({ posts, isLoading, onRefresh }: PostsListProps) {
   const [activeTab, setActiveTab] = useState<'scheduled' | 'published' | 'failed'>('scheduled');
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [deletePostId, setDeletePostId] = useState<string | null>(null);
 
   const filteredPosts = posts.filter((p) => {
     if (activeTab === 'scheduled') return p.status === 'scheduled' || p.status === 'draft';
@@ -31,8 +33,10 @@ export function PostsList({ posts, isLoading, onRefresh }: PostsListProps) {
     return true;
   });
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Вы уверены, что хотите удалить эту публикацию?')) return;
+  const confirmDelete = async () => {
+    if (!deletePostId) return;
+    const id = deletePostId;
+    setDeletePostId(null);
     setProcessingId(id);
 
     try {
@@ -45,6 +49,10 @@ export function PostsList({ posts, isLoading, onRefresh }: PostsListProps) {
     } finally {
       setProcessingId(null);
     }
+  };
+
+  const handleDelete = (id: string) => {
+    setDeletePostId(id);
   };
 
   const handlePublishNow = async (id: string) => {
@@ -273,6 +281,17 @@ export function PostsList({ posts, isLoading, onRefresh }: PostsListProps) {
           })
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={Boolean(deletePostId)}
+        title="Удалить публикацию?"
+        description="Вы уверены, что хотите удалить эту публикацию? Это действие нельзя отменить."
+        confirmText="Удалить"
+        cancelText="Отмена"
+        isDanger={true}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeletePostId(null)}
+      />
     </div>
   );
 }

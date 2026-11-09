@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
+import { isRequestAuthenticated } from '@/lib/auth';
 import { sendAdminNotification } from '@/lib/telegram';
 import { executePostPublish } from '@/lib/publisher';
 
@@ -22,7 +23,8 @@ async function handleCronPublish(req: NextRequest) {
   const isAuthorized =
     !cronSecret ||
     keyParam === cronSecret ||
-    authHeader === `Bearer ${cronSecret}`;
+    authHeader === `Bearer ${cronSecret}` ||
+    isRequestAuthenticated();
 
   if (!isAuthorized) {
     return NextResponse.json({ error: 'Неверный ключ CRON' }, { status: 401 });

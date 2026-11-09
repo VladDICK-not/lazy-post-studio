@@ -188,6 +188,16 @@ export function PostComposer({
     setIsSubmitting(true);
     setErrorMsg(null);
 
+    const selectedChannels = channels.filter((c) => selectedChannelIds.includes(c.id));
+    const willPublishTelegram =
+      channels.length > 0
+        ? selectedChannels.some((c) => c.platform === 'telegram')
+        : publishToTelegram;
+    const willPublishThreads =
+      channels.length > 0
+        ? selectedChannels.some((c) => c.platform === 'threads')
+        : publishToThreads;
+
     try {
       const payload = {
         title: title.trim(),
@@ -196,8 +206,8 @@ export function PostComposer({
         threads_custom_text: showThreadsCustom ? threadsCustomText : null,
         media_url: mediaUrl.trim() || null,
         scheduled_at: new Date(scheduledAt).toISOString(),
-        publish_to_telegram: publishToTelegram,
-        publish_to_threads: publishToThreads,
+        publish_to_telegram: willPublishTelegram,
+        publish_to_threads: willPublishThreads,
         target_channel_ids: channels.length > 0 ? selectedChannelIds : [],
         publish_now: publishNow,
       };
