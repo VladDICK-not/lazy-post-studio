@@ -29,7 +29,12 @@ export function PostsList({ posts, isLoading, onRefresh, onEditPost }: PostsList
   const [deletePostId, setDeletePostId] = useState<string | null>(null);
 
   const filteredPosts = posts.filter((p) => {
-    if (activeTab === 'scheduled') return p.status === 'scheduled' || p.status === 'draft';
+    if (activeTab === 'scheduled')
+      return (
+        p.status === 'scheduled' ||
+        p.status === 'draft' ||
+        p.status === 'publishing'
+      );
     if (activeTab === 'published') return p.status === 'published';
     if (activeTab === 'failed') return p.status === 'failed';
     return true;
@@ -87,7 +92,9 @@ export function PostsList({ posts, isLoading, onRefresh, onEditPost }: PostsList
     }
   };
 
-  const scheduledCount = posts.filter((p) => p.status === 'scheduled').length;
+  const scheduledCount = posts.filter(
+    (p) => p.status === 'scheduled' || p.status === 'publishing'
+  ).length;
   const publishedCount = posts.filter((p) => p.status === 'published').length;
   const failedCount = posts.filter((p) => p.status === 'failed').length;
 
@@ -206,6 +213,12 @@ export function PostsList({ posts, isLoading, onRefresh, onEditPost }: PostsList
                   </h3>
 
                   {/* Status Badge */}
+                  {post.status === 'publishing' && (
+                    <span className="flex items-center gap-1.5 text-[10px] font-medium px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 whitespace-nowrap animate-pulse">
+                      <Loader2 className="w-3 h-3 animate-spin text-amber-500" />
+                      Отправляется...
+                    </span>
+                  )}
                   {post.status === 'scheduled' && (
                     <span className="flex items-center gap-1 text-[10px] font-mono font-medium px-2 py-0.5 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 whitespace-nowrap">
                       <Clock className="w-3 h-3" />
@@ -252,6 +265,12 @@ export function PostsList({ posts, isLoading, onRefresh, onEditPost }: PostsList
 
                   {/* Actions */}
                   <div className="flex items-center gap-1.5">
+                    {post.status === 'publishing' && (
+                      <span className="text-[10px] text-zinc-400 dark:text-zinc-500 italic flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin text-amber-500" /> Отправка...
+                      </span>
+                    )}
+
                     {post.status === 'failed' && (
                       <button
                         type="button"
